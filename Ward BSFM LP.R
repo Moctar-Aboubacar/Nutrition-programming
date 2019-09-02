@@ -30,7 +30,6 @@ dat <- na.omit(dat[,1:23]) # all NAs are dropped from the analysis, except those
 # 2 translate beneficiaries into KGs
 dat$kg_req <- (dat$children_tot_num*6) + (dat$plw_tot_num*12)
 
-
 # Linear programming algorithm for knapsack problem ####
 # objective function: the number of people affected
 dat <- mutate(dat, plw_children_affect_tot = plw_affect_num + children_affect_num)
@@ -87,7 +86,6 @@ Wards_by_MT <- ggplot(results_lp, aes(x = (ration_kg/1000), y = wards))+
        y = "Number of Wards",
        x = "BSFP Metric Tonnes")
 
-
 # 2 How many wards per district are reachable in each of the different scenarios?
 viztable1 <- dat %>% 
   group_by(District) %>% 
@@ -96,16 +94,13 @@ viztable1 <- dat %>%
 ration_mt <- ration_kg/1000
 names(viztable1)[2:29] <- ration_mt # rename columns according to metric tonnage designation
 
-
 viztable1 <- gather(viztable1, key = "MTs", value = "Wards",
                     c(2:29))
 # viztable1$MTs <- as.integer(viztable1$MTs)
 
-
 nominalDistricts <- c("grey60","grey60","grey60","grey60", "indianred4","grey60")
 
-require('directlabels')
-
+#require('directlabels')
 District_compare <- ggplot(viztable1, aes(x = MTs, y = Wards, group = District))+
   geom_line(aes(color = District), size = 1.1)+
   scale_color_manual(values = nominalDistricts)+
@@ -142,3 +137,4 @@ Percentage_coverage <- ggplot(viztable2, aes(x = MTs, y = perc_affected))+
        subtitle = "500 MTs covers over 75% of affected people",
        x = "BSFP Metric tonnes",
        y = "% affected people reached")
+
