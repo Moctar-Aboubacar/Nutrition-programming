@@ -9,6 +9,6 @@ The goal of this analysis is to achieve that optimization across Wards (the lowe
 
 The percentage of population affected (pop_affect_perc) is a measure of the estimated percentage of people affected by flooding in each ward. From this measure (obtained via overlaying settlement-level population estimates with Sentinel-1 inundation mapping) we obtain an estimate of the number of affected pregnant and lactating women and of children under 5 in each Ward. This parameter becomes the objective function to maximize in the models.
 
-The most efficient allocation across wards is run considering different available amounts (metric tonnes) to distribute (itself a function of the organization's resourcing, though this analysis could be used to lobby donors for funding). These amounts range from 300 MTs to 1000 MTs.
+The most efficient allocation across wards is run considering different available amounts (metric tonnes) to distribute (itself a function of the organization's resourcing, though this analysis could be used to lobby donors for funding). These amounts range from 300 MTs to 1000 MTs.Finally three different visuals are designed in order to help management and programme officers to allocate resources across different wards.
 
-Finally three different visuals are designed in order to help management and programme officers to allocate resources across different wards.
+In the future this type of analysis could shape both the immediate Ward-level prioritization of assistance and be used as a tool to lobby donors for resources and to guide intra-UN response coordination efforts. Ultimately many factors will weigh into the decision on where to allocate food assistance, and this type of analysis will be but one of those.
