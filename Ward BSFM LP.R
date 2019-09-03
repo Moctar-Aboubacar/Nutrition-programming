@@ -19,9 +19,9 @@ glimpse(dat)
 dat[,c(17:22)]<- as.data.frame(apply(dat[,c(17:22)], 2,
                                        function(x){
                                          as.numeric(gsub("%", "", x))
-                                         }
-                                       )
-                                 )
+                                       }
+                                    )
+                              )
 
 sum(is.na(dat$plw_affect_perc)) # 77 NAs, leaving 313-77 = 236 wards under consideration
 
@@ -86,7 +86,7 @@ Wards_by_MT <- ggplot(results_lp, aes(x = (ration_kg/1000), y = wards))+
        y = "Number of Wards",
        x = "BSFP Metric Tonnes")
 
-# 2 How many wards per district are reachable in each of the different scenarios?
+# 2. How many wards per district are reachable in each of the different scenarios?
 viztable1 <- dat %>% 
   group_by(District) %>% 
   summarise_at(vars(starts_with('V')), sum)
@@ -114,7 +114,7 @@ District_compare <- ggplot(viztable1, aes(x = MTs, y = Wards, group = District))
        y = "Number of Wards")
 
 
-# 3  what percentage of  affected people are covered by different levels of BFSP Metric Tonnage? 
+# 3. What percentage of  affected people are covered by different levels of BFSP Metric Tonnage? 
 
 viztable2 <- mutate(dat, plw_children_affect_perc = plw_children_affect_tot/sum(plw_children_affect_tot)) 
 
