@@ -565,7 +565,7 @@ District_compare </code></pre>
 </div>
 <div id="affected-people" class="section level5">
 <h5><em>3. % affected people</em></h5>
-<p>Contrary to the number of Wards, the relationship between the percentage of affected people covered and the MTs used is quadratic. We expect this result, which shows that efficiency gains in delivery slow down at higher metric tonnes. This result suggests that the analysis is doing what it should be; at higher levels of metric tonnes we start to cover more and more ‘inefficient’ Wards with fewer total population directly affected within them. So while 75% of all affected people are covered by 500 MTs, we need some 900 MTs to increase our coverage by just 20 percentage points.</p>
+<p>Contrary to the number of Wards, the relationship between the percentage of affected people covered and the MTs used is curvilinear. We expect this result, which shows that efficiency gains in delivery slow down at higher metric tonnes. This result suggests that the analysis is doing what it should be; at higher levels of metric tonnes we start to cover more and more ‘inefficient’ Wards with fewer total population directly affected within them. So while 75% of all affected people are covered by 500 MTs, we need some 900 MTs to increase our coverage by just 20 percentage points.</p>
 <pre class="r"><code>viztable2 &lt;- mutate(dat, plw_children_affect_perc = plw_children_affect_tot/sum(plw_children_affect_tot)) 
 
 names(viztable2)[26:53] &lt;- ration_mt
