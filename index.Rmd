@@ -1,0 +1,237 @@
+---
+title: "Nutrition Programming"
+author: "By Moctar Aboubacar"
+date: "1/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+```
+
+**[Data](#data)**
+
+**[Resource Allocation as a Knapsack Problem](#ward-resource-allocation-as-a-knapsack-problem)**
+
+**[Iterating across a range of MTs](#calculation-across-multiple-mt-options)**
+
+**[Results](#results)**
+
+**[Discussion](#discussion)**
+
+
+### *Optimizing the allocation of supercereal food commodities to flood-affected Wards in Nepal in 2019*
+
+Annual flooding in Nepal's Terai region exacerbates an already alarming child malnutrition situation. The World Food Programme (WFP) crafts its response to floods based on an assessment of affected areas and persons (extent, severity and drivers), existing responses, intra-UN programming coordination, and available resources.
+
+The standard emergency nutrition intervention in this case is known as a Blanket Supplementary Feeding Programme (BSFP). Through BSFP, WFP transfers vitamin and mineral-fortified 'supercereal' to all pregnant and lactating women, and children between the ages of 6-59 months, within a given geographical area. Household level targeting is not done for BSFP; all eligible persons within the geographical areas receive the assistance. In July 2019, Nepal's Terai region suffered widespread flooding, with at least 6 Districts severely affected.
+
+The nature of BSFP distribution poses a unique challenge in the context of flooding however, as unlike emergencies which tend to affect areas uniformly (such as drought), flooding can be highly localized. Given this, a blanket food distribution is likely to include people who are not in need of the food--in this case, pregnant and lactating women, and children 6-59 months who were not directly affected by flooding (for example, whose household food stores were not destroyed, etc.). Given limited resources, WFP's assistance should maximize assistance to directly affected populations.
+
+The goal of this analysis is to achieve that optimization across Wards (the lowest administrative unit in Nepal. Wards are nested into municipalities, nested into Districts. A Ward may have a population of between 2,000-8,000 inhabitants) in the 6 most flood-affected Districts. This analysis treats the problem as a linear programming constrained optimization problem, specifically as a knapsack problem in which the inclusion of a unit (here a Ward) contributes to an overal objective function (estimated number of directly affected people), but at a cost (the constraint) of resources (in metric tonnes of supercereal). This analysis optimizes the combination of Wards in which to intervene at different levels of supercereal metric tonnes (representing different scenarios/possible resourcing levels).
+
+
+#### **Data**
+
+We start by loading the data. Estimations of population affected by flooding were obtained by calculating the number of children under 5 and pregnant and lactating women directly exposed to flooding. This was done through Sentinel 1-based flood extent analysis overlayed with Worldpop and Nepal Census-based population estimations.
+
+```{r warning=FALSE, message=FALSE}
+# load packages
+require(lpSolve)
+require(tidyverse)
+require(directlabels)
+
+# import data
+dat <- read.csv("C:/Users/Leurre/Desktop/r stuff/BFSP LP/Ward Exposure rank v1.csv")
+glimpse(dat)
+```
+
+A quick glimpse shows that the data is a little messy. Part of this is because we used Excel to get the base data, and part of it is due to a number of missing data for wards in which satellite coverage was not available for the inundation period. The first rows for Dhanusa district represent wards for which satellite data was unavailable, and we are unable to produce estimates of affected population here.
+
+```{r eval = TRUE, results = 'hide'}
+# eliminate excel N/As for nonapplicable wards
+dat[,c(17:22)]<- as.data.frame(apply(dat[,c(17:22)], 2,
+                                       function(x){
+                                         as.numeric(gsub("#N/A", "", x))
+                                         }))
+
+# 77 NAs, leaving 313-77 = 236 wards under consideration
+sum(is.na(dat$plw_affect_perc)) 
+
+# all NAs are dropped from the analysis, except those from the nutrition assessment
+dat <- na.omit(dat[,1:23]) 
+```
+
+The percentage of population affected (pop_affect_perc) is a measure of the estimated percentage of people affected by flooding in each ward. From this measure (obtained via overlaying settlement-level population estimates with Sentinel-1 inundation mapping) we obtain an estimate of the number of affected pregnant and lactating women and of children under 5 in each Ward. This parameter becomes the objective function to maximize in the models.
+
+
+#### **Ward resource allocation as a knapsack problem**
+
+We can optimize the allocation of MTs across Wards by ensuring that for any level of MT, the combination of wards which includes the most directly affected people is chosen. This is modelled as a simple knapsack problem. We start by testing the idea with an indicative value of 180 MTs
+
+```{r eval = T}
+# translate beneficiaries into KGs: 6kgs per child and 12 Kgs per plw (pregnant/lactating woman)
+dat$kg_req <- (dat$children_tot_num*6) + (dat$plw_tot_num*12)
+
+# objective function: the number of people affected
+dat <- mutate(dat, plw_children_affect_tot = plw_affect_num + children_affect_num)
+knapsack.obj <- dat$plw_children_affect_tot
+
+# constraints
+knapsack.con <- matrix(dat$kg_req, nrow = 1, byrow = TRUE)
+knapsack.dir <- "<="
+knapsack.rhs <- c(180000) # test for 180 MT first
+
+# LP function first iteration
+ksSolution <- lp("max", 
+                 knapsack.obj, 
+                 knapsack.con, 
+                 knapsack.dir, 
+                 knapsack.rhs, 
+                 all.bin = TRUE)
+
+solution <- ksSolution$solution
+
+sum(solution) # 40 wards are selected with 180 MT, stored in the solution vector
+
+head(solution, n = 10)
+
+```
+
+
+#### **Calculation across multiple MT options**
+
+The solution vector obtained above is binary (1:0), where 1 signifies inclusion and 0 exclusion. At 180 MTs, a total of 40 Wards are selected to undertake the BSFP programme.
+
+The whole point of this analysis is to understand how the number and location of Wards varies under different MT assumptions, so we iterate this process to cover a range of possible MTs.
+
+```{r results = 'hide'}
+# we repeat the process, this time obtaining the wards selected under different scenarios (300-975 MT, by increment of 25 MT)
+numbers <- c(300000:975000)
+
+# progressing by intervals of 25 MTs
+ration_kg <- numbers[seq(1, length(numbers), 25000)] 
+
+# create empty vector for the wards
+wards <- vector() 
+
+# number of columns for data frame
+colLength <- length(dat) 
+
+for (i in seq_along(ration_kg)){
+  
+  a <- lp("max", 
+          knapsack.obj, 
+          knapsack.con, 
+          knapsack.dir, 
+          ration_kg[i], 
+          all.bin = TRUE)
+  
+  wards[i] <- sum(a$solution)
+  
+  dat[colLength + i] <- a$solution
+}
+
+# a list of the number of wards covered by each MT amount
+results_lp <- data.frame(wards, ration_kg) 
+```
+
+
+#### **Results**
+
+Applying the linear programming algorithm over different MT constraints yields some interesting and very actionable results. A humanitarian response will consider these results through three central questions:
+
+1. How many wards total are reachable under different MT scenarios?
+2. How many wards per district are reachable under different MT scenarios?
+3. What percentage of all affected people are covered by different MT levels?
+
+##### *1. Total wards reachable*
+
+Adding metric tonnes increases the Ward coverage by the same rate. This is unsurprising as Wards are small enough in population, and numerous enough in the analysis we have here that 25 additional metric tonnes (the interval we are working with) is often enough to include at least one additional Ward. If we had seen a stepwise increase in the number of Wards we would know that we are dealing with larger populations. A flexible targeting approach, closely informed by this analysis, could therefore be possible.
+
+```{r}
+Wards_by_MT <- ggplot(results_lp, aes(x = (ration_kg/1000), y = wards))+
+  geom_line(color = "indianred4", size = 1.2)+
+  theme_bw()+
+  labs(title = "Wards by possible BSFP MT Allocation",
+       caption = "Out of a total 236 Wards",
+       y = "Number of Wards",
+       x = "BSFP Metric Tonnes")
+
+Wards_by_MT
+```
+
+##### *2. Wards per District*
+
+Broken down by District, we can see some basic differences. Sarlahi District notably sees a sharper increase in the number of Wards it has covered as metric tonnage increases. This is likely due to the number of Wards and their size (relatively smaller). This is a significant result as any Ward-wise targeting will have to deal with municipal and District governments, and imbalances in the coverage proposed by the WFP could be met with resistance by local governments.
+
+```{r}
+viztable1 <- dat %>% 
+  group_by(District) %>% 
+  summarise_at(vars(starts_with('V')), sum)
+
+ration_mt <- ration_kg/1000
+names(viztable1)[2:29] <- ration_mt # rename columns according to metric tonnage designation
+
+
+viztable1 <- gather(viztable1, key = "MTs", value = "Wards",
+                    c(2:29))
+# viztable1$MTs <- as.integer(viztable1$MTs)
+
+nominalDistricts <- c("grey60","grey60","grey60","grey60", "indianred4","grey60")
+
+District_compare <- ggplot(viztable1, aes(x = MTs, y = Wards, group = District))+
+  geom_line(aes(color = District), size = 1.1)+
+  scale_color_manual(values = nominalDistricts)+
+  scale_x_discrete(breaks = 14, expand = c(0, 3))+
+  geom_dl(aes(label = District, color = District), method = list(dl.combine('first.points', "last.points"), cex = 0.9))+
+  labs(title = "By-District Ward Numbers per Metric Tonnage",
+       subtitle = "Sarlahi consistently counts the most wards above ~400 MTs",
+       x = "BSFP Metric tonnes- 300 (min) to 975 (max)",
+       y = "Number of Wards")+
+  theme_bw()+
+  theme(legend.position = 'none')
+
+District_compare 
+```
+
+##### *3. % affected people*
+
+Contrary to the number of Wards, the relationship between the percentage of affected people covered and the MTs used is curvilinear. We expect this result, which shows that efficiency gains in delivery slow down at higher metric tonnes. This result suggests that the analysis is doing what it should be; at higher levels of metric tonnes we start to cover more and more 'inefficient' Wards with fewer total population directly affected within them. So while 75% of all affected people are covered by 500 MTs, we need some 900 MTs to increase our coverage by just 20 percentage points.
+
+```{r}
+viztable2 <- mutate(dat, plw_children_affect_perc = plw_children_affect_tot/sum(plw_children_affect_tot)) 
+
+names(viztable2)[26:53] <- ration_mt
+
+viztable2 <- gather(viztable2, key = "MTs", value = "Wards",
+                    c(26:53))
+
+viztable2 <- viztable2 %>% 
+  group_by(MTs, Wards) %>% 
+  summarise(perc_affected = sum(plw_children_affect_perc)) %>% 
+  filter(Wards == 1)
+
+viztable2$MTs <- as.integer(viztable2$MTs)
+
+Percentage_coverage <- ggplot(viztable2, aes(x = MTs, y = perc_affected))+
+  geom_line(color = "indianred4", size = 1.2)+
+  theme_bw()+
+  labs(title = "Percentage Affected Coverage",
+       subtitle = "500 MTs covers over 75% of affected people",
+       x = "BSFP Metric tonnes",
+       y = "% affected people reached")
+
+Percentage_coverage
+```
+
+
+#### **Discussion**
+
+Some thoughts on the significance of this analysis:
+
+- Humanitarian actor need clear and objective guidance to ensure optimal targeting when responding to disasters. This is especially true as actors rarely know on day 1 of a crisis the level of resources they will be able to mobilize.
+
+- Practically however, analyses like the above will always be complemented by politically-tinged negotiations about where agencies can go and who they can/should reach. Analyses like these probably serve best as rough guidelines than firm targeting criteria.
+
+- This particular approach could be supplemented by a measure of vulnerability (instead of just exposure to flooding). A vulnerability index, for example including estimations of malnutrition and building quality at Ward or municipal level, would be more convincing as a real targeting tool.
